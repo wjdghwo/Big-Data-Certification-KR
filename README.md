@@ -7,6 +7,251 @@ https://www.kaggle.com/agileteam/bigdatacertificationkr
 
 
 
+import numpy as np
+import pandas as pd
+import random
+from random import randint
+
+import plotly.express as px
+import plotly.graph_objects as go
+from dash import Dash, dcc, html, Input, Output
+
+
+row = ['취급건수', '취급액', '약정금리', '기준금리', '조달원가', 
+       'Duration', '업무원가', '공통원가', '채널별가산금리', '모집수수료', 
+       '신용원가', '목표이익률', '조정금리', '우대금리', '프로모션금리', 
+       '상품운영금리', '조달조정금리', '적용이익율']
+
+col = pd.date_range('2022-07-01', '2022-07-31')
+
+channel = ['전체', '제휴연계외', '제휴연계', 
+           '상담사', 'direct', 
+           '카카오', '엘포인트', '토스', '핀다', '카카오페이', 
+           '핀크', '시럽', '알다', '신한카드', '케이뱅크', 
+           '뱅크샐러드', '하나카드', '페이코', '키움증권', 'NICE평가정보']
+
+data = pd.DataFrame()
+
+for i in range(len(channel)):
+    data_temp = pd.DataFrame({'취급건수':np.random.binomial(400, 0.5, size=len(col)),
+                        '취급액':np.random.binomial(10000, 0.4, size=len(col)),
+                        '약정금리':np.random.normal(12, 1, size=len(col)),
+                        '기준금리':np.random.normal(14, 1, size=len(col)),
+                        '조달원가':np.random.normal(4, 0.5, size=len(col)),
+                        'Duration':np.random.normal(43, 2, size=len(col)),
+                        '업무원가':np.random.normal(2.5, 0.3, size=len(col)),
+                        '공통원가':np.random.normal(1.4, 0.1, size=len(col)),
+                        '채널별가산금리':abs(np.random.normal(0.1, 0.1, size=len(col))),
+                        '모집수수료':abs(np.random.normal(1, 0.1, len(col))),
+                        '신용원가':np.random.normal(5, 0.5, len(col)),
+                        '목표이익률':np.random.normal(3.2, 0.1, len(col)),
+                        '조정금리':abs(np.random.normal(2.3, 0.2, len(col)))*(-1),
+                        '우대금리':abs(np.random.normal(0, 0.05, len(col)))*(-1),
+                        '프로모션금리':abs(np.random.normal(1.8, 0.3, len(col)))*(-1),
+                        '상품운영금리':abs(np.random.normal(0.5, 0.2, len(col)))*(-1),
+                        '조달조정금리':abs(np.random.normal(0.01, 0.01, len(col)))*(-1),
+                        '적용이익율':abs(np.random.normal(0.8, 0.1, len(col)))}).T
+    data_temp.columns=col
+    data_temp['channel'] = channel[i]
+    data=pd.concat([data,data_temp],axis=0)
+
+df = data1.reset_index().melt(id_vars=['index','channel'], var_name = ['date']).rename(columns = {'index':'type'})
+
+
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+app = Dash(__name__, external_stylesheets=external_stylesheets)
+
+markdown_text = '''
+# 개인신용대출 금리원가별 Monitoring
+### 작성기준
+
+* 대상기준 : 개인신용대출 신규상품 당일 실행 및 당일 출금 고객 (실행일 이후 수시출입금, 당일취소 제외)
+* 집계기준 : 원가별 출금액 가준평균금리
+* 고객별 예상 마진율 : 약정금리 - sum(조달원가, 업무원가, 신용원가)
+'''
+
+dcc.Markdown(children=markdown_text)
+
+app.layout = html.Div([
+    html.Div([
+        dcc.Markdown(children=markdown_text)
+    ]),
+
+    
+    html.Div([
+
+        html.Div([
+            dcc.Dropdown(
+                df['channel'].unique(),
+                'Fertility rate, total (births per woman)',
+                id='crossfilter-xaxis-column',
+            ),
+            dcc.RadioItems(
+                ['Linear', 'Log'],
+                'Linear',
+                id='crossfilter-xaxis-type',
+                labelStyle={'display': 'inline-block', 'marginTop': '5px'}
+            )
+        ],
+        style={'width': '49%', 'display': 'inline-block'}),
+
+        html.Div([
+            dcc.Dropdown(
+                df['channel'].unique(),
+                'Life expectancy at birth, total (dates)',
+                id='crossfilter-yaxis-column'
+            ),
+            dcc.RadioItems(
+                ['Linear', 'Log'],
+                'Linear',
+                id='crossfilter-yaxis-type',
+                labelStyle={'display': 'inline-block', 'marginTop': '5px'}
+            )
+        ], style={'width': '49%', 'float': 'right', 'display': 'inline-block'})
+    ], style={
+        'padding': '10px 5px'
+    }),
+    
+    # 우측상단 그래프
+    html.Div([
+        dcc.Graph(
+            id='crossfilter-indicator-scatter',
+            hoverData={'points': [{'customdata': '적용이익율'}]}
+        )
+    ], style={'width': '49%', 'display': 'inline-block', 'padding': '0 20'}),
+    html.Div([
+        dcc.Graph(id='x-time-series'),
+        dcc.Graph(id='y-time-series'),
+    ], style={'display': 'inline-block', 'width': '49%'}),
+
+    
+    # 우측하단 그래프
+    html.Div(dcc.Slider(
+        df['channel'].min(),
+        df['date'].max(),
+        step=None,
+        id='crossfilter-date--slider',
+        value=df['date'].max(),
+        marks={str(date): str(date) for date in df['date'].unique()}
+    ), style={'width': '49%', 'padding': '0px 20px 20px 20px'})
+])
+
+
+@app.callback(
+    Output('crossfilter-indicator-scatter', 'figure'),
+    Input('crossfilter-xaxis-column', 'value'),
+    Input('crossfilter-yaxis-column', 'value'),
+    Input('crossfilter-xaxis-type', 'value'),
+    Input('crossfilter-yaxis-type', 'value'),
+    Input('crossfilter-date--slider', 'value'))
+def update_graph(xaxis_column_name, yaxis_column_name,
+                 xaxis_type, yaxis_type,
+                 date_value):
+    dff = df[df['date'] == date_value]
+
+    fig = px.scatter(x=dff[dff['channel'] == xaxis_column_name]['value'],
+            y=dff[dff['channel'] == yaxis_column_name]['value'],
+            hover_name=dff[dff['channel'] == yaxis_column_name]['type']
+            )
+
+    fig.update_traces(customdata=dff[dff['channel'] == yaxis_column_name]['type'])
+
+    fig.update_xaxes(title=xaxis_column_name, type='linear' if xaxis_type == 'Linear' else 'log')
+
+    fig.update_yaxes(title=yaxis_column_name, type='linear' if yaxis_type == 'Linear' else 'log')
+
+    fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
+
+    return fig
+
+
+def create_time_series(dff, axis_type, title):
+
+    fig = px.scatter(dff, x='date', y='value')
+
+    fig.update_traces(mode='lines+markers')
+
+    fig.update_xaxes(showgrid=False)
+
+    fig.update_yaxes(type='linear' if axis_type == 'Linear' else 'log')
+
+    fig.add_annotation(x=0, y=0.85, xanchor='left', yanchor='bottom',
+                       xref='paper', yref='paper', showarrow=False, align='left',
+                       text=title)
+
+    fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10})
+
+    return fig
+
+
+@app.callback(
+    Output('x-time-series', 'figure'),
+    Input('crossfilter-indicator-scatter', 'hoverData'),
+    Input('crossfilter-xaxis-column', 'value'),
+    Input('crossfilter-xaxis-type', 'value'))
+def update_y_timeseries(hoverData, xaxis_column_name, axis_type):
+    country_name = hoverData['points'][0]['customdata']
+    dff = df[df['type'] == country_name]
+    dff = dff[dff['channel'] == xaxis_column_name]
+    title = '<b>{}</b><br>{}'.format(country_name, xaxis_column_name)
+    return create_time_series(dff, axis_type, title)
+
+
+@app.callback(
+    Output('y-time-series', 'figure'),
+    Input('crossfilter-indicator-scatter', 'hoverData'),
+    Input('crossfilter-yaxis-column', 'value'),
+    Input('crossfilter-yaxis-type', 'value'))
+def update_x_timeseries(hoverData, yaxis_column_name, axis_type):
+    dff = df[df['type'] == hoverData['points'][0]['customdata']]
+    dff = dff[dff['channel'] == yaxis_column_name]
+    return create_time_series(dff, axis_type, yaxis_column_name)
+
+if __name__ == '__main__':
+    app.run_server(host='localhost',port=8007)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
