@@ -18,6 +18,7 @@ https://www.kaggle.com/agileteam/bigdatacertificationkr
 
 
 
+
 import numpy as np
 import pandas as pd
 import random
@@ -66,13 +67,26 @@ for i in range(len(channel)):
     data_temp['channel'] = channel[i]
     data=pd.concat([data,data_temp],axis=0)
 
-df = data1.reset_index().melt(id_vars=['index','channel'], var_name = ['date']).rename(columns = {'index':'type'})
+df = data.reset_index().melt(id_vars=['index','channel'], var_name = ['date']).rename(columns = {'index':'type'})
 
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = Dash(__name__, external_stylesheets=external_stylesheets)
 
+
+def create_time_series(dff, axis_type, title):
+    fig = px.scatter(dff, x='date', y='value')
+    fig.update_traces(mode='lines+markers')
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(type='linear' if axis_type == 'Linear' else 'log')
+    fig.add_annotation(x=0, y=0.85, xanchor='left', yanchor='bottom',
+                       xref='paper', yref='paper', showarrow=False, align='left',
+                       text=title)
+    fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10})
+    return fig
+
+    
 markdown_text = '''
 # 개인신용대출 금리원가별 Monitoring
 ### 작성기준
@@ -156,43 +170,17 @@ app.layout = html.Div([
     Input('crossfilter-xaxis-type', 'value'),
     Input('crossfilter-yaxis-type', 'value'),
     Input('crossfilter-date--slider', 'value'))
-def update_graph(xaxis_column_name, yaxis_column_name,
-                 xaxis_type, yaxis_type,
-                 date_value):
+def update_graph(xaxis_column_name, yaxis_column_name, xaxis_type, yaxis_type, date_value):
     dff = df[df['date'] == date_value]
-
+    
     fig = px.scatter(x=dff[dff['channel'] == xaxis_column_name]['value'],
-            y=dff[dff['channel'] == yaxis_column_name]['value'],
-            hover_name=dff[dff['channel'] == yaxis_column_name]['type']
-            )
-
+                     y=dff[dff['channel'] == yaxis_column_name]['value'],
+                     hover_name=dff[dff['channel'] == yaxis_column_name]['type'])
+    
     fig.update_traces(customdata=dff[dff['channel'] == yaxis_column_name]['type'])
-
     fig.update_xaxes(title=xaxis_column_name, type='linear' if xaxis_type == 'Linear' else 'log')
-
     fig.update_yaxes(title=yaxis_column_name, type='linear' if yaxis_type == 'Linear' else 'log')
-
     fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
-
-    return fig
-
-
-def create_time_series(dff, axis_type, title):
-
-    fig = px.scatter(dff, x='date', y='value')
-
-    fig.update_traces(mode='lines+markers')
-
-    fig.update_xaxes(showgrid=False)
-
-    fig.update_yaxes(type='linear' if axis_type == 'Linear' else 'log')
-
-    fig.add_annotation(x=0, y=0.85, xanchor='left', yanchor='bottom',
-                       xref='paper', yref='paper', showarrow=False, align='left',
-                       text=title)
-
-    fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10})
-
     return fig
 
 
@@ -208,7 +196,6 @@ def update_y_timeseries(hoverData, xaxis_column_name, axis_type):
     title = '<b>{}</b><br>{}'.format(country_name, xaxis_column_name)
     return create_time_series(dff, axis_type, title)
 
-
 @app.callback(
     Output('y-time-series', 'figure'),
     Input('crossfilter-indicator-scatter', 'hoverData'),
@@ -220,7 +207,7 @@ def update_x_timeseries(hoverData, yaxis_column_name, axis_type):
     return create_time_series(dff, axis_type, yaxis_column_name)
 
 if __name__ == '__main__':
-    app.run_server(host='localhost',port=8007)
+    app.run_server(host='localhost',port=8008)
 
 
 
