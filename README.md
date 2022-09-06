@@ -207,7 +207,7 @@ def update_x_timeseries(hoverData, yaxis_column_name, axis_type):
     return create_time_series(dff, axis_type, yaxis_column_name)
 
 if __name__ == '__main__':
-    app.run_server(host='localhost',port=8008)
+    app.run_server(host='0.0.0.0', debug=True)
 
 
 
