@@ -70,6 +70,189 @@ for i in range(len(channel)):
 df = data.reset_index().melt(id_vars=['index','channel'], var_name = ['date']).rename(columns = {'index':'type'})
 
 
+
+# 왼쪽 그래프 평균값 비교 비율 막대그래프
+# 유형 비교 선택지 추가, 선택시 오른쪽 그래프 값 변경
+
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+app = Dash(__name__, external_stylesheets=external_stylesheets)
+
+
+def create_time_series(dff, axis_type, title):
+    fig = px.scatter(dff, x='date', y='value')
+    fig.update_traces(mode='lines+markers')
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes()
+    fig.add_annotation(x=0, y=0.85, xanchor='left', yanchor='bottom',
+                       xref='paper', yref='paper', showarrow=False, align='left',
+                       text=title)
+    fig.update_layout(height=225, margin={'l': 20, 'b': 30, 'r': 10, 't': 10})
+    return fig
+
+    
+markdown_text = '''
+# 개인신용대출 금리원가별 Monitoring
+### 작성기준
+
+* 대상기준 : 개인신용대출 신규상품 당일 실행 및 당일 출금 고객 (실행일 이후 수시출입금, 당일취소 제외)
+* 집계기준 : 원가별 출금액 가준평균금리
+* 고객별 예상 마진율 : 약정금리 - sum(조달원가, 업무원가, 신용원가)
+'''
+
+dcc.Markdown(children=markdown_text)
+
+app.layout = html.Div([
+    html.Div([
+        dcc.Markdown(children=markdown_text)
+    ]),
+
+    
+    html.Div([
+
+        html.Div([
+            dcc.Dropdown(
+                df['channel'].unique(),
+                'first channel',
+                id='crossfilter-xaxis-column',
+            )
+        ],
+        style={'width': '49%', 'display': 'inline-block'}),
+
+        html.Div([
+            dcc.Dropdown(
+                df['channel'].unique(),
+                'second channel',
+                id='crossfilter-yaxis-column'
+            )
+        ], style={'width': '49%', 'float': 'right', 'display': 'inline-block'}),
+        
+        html.Div([
+            dcc.RadioItems(
+                df['type'].unique(),
+                '취급건수',
+                id='crossfilter-yaxis-type',
+                labelStyle={'display': 'inline-block', 'marginTop': '5px'}
+            )])
+    ], style={
+        'padding': '10px 5px'
+    }),
+    
+    # 우측상단 그래프
+    html.Div([
+        dcc.Graph(
+            id='crossfilter-indicator-scatter',
+            hoverData={'points': [{'customdata': 'type'}]}
+        )
+    ], style={'width': '49%', 'display': 'inline-block', 'padding': '0 20'}),
+    html.Div([
+        dcc.Graph(id='x-time-series'),
+        dcc.Graph(id='y-time-series'),
+    ], style={'display': 'inline-block', 'width': '49%'}),
+
+    
+    # 우측하단 그래프
+    html.Div(dcc.Slider(
+        df['channel'].min(),
+        df['date'].max(),
+        step=None,
+        id='crossfilter-date--slider',
+        value=df['date'].max(),
+        marks={str(date): str(date) for date in df['date'].unique()}
+    ), style={'width': '49%', 'padding': '0px 20px 20px 20px'})  
+    
+])
+
+
+@app.callback(
+    Output('crossfilter-indicator-scatter', 'figure'),
+    Input('crossfilter-xaxis-column', 'value'),
+    Input('crossfilter-yaxis-column', 'value'),
+    Input('crossfilter-yaxis-type', 'value'),
+    Input('crossfilter-date--slider', 'value'))
+def update_graph(xaxis_column_name, yaxis_column_name, yaxis_type, date_value):
+    dff = df[df['date'] == date_value]
+    dff1 = dff.groupby(['type','channel']).mean().reset_index()
+    fig = px.histogram(dff1[(dff1['channel'] == xaxis_column_name)|(dff1['channel'] == yaxis_column_name)], 
+                       x='type', y='value', color = 'channel', barnorm = "percent")    
+    fig.update_traces()
+    fig.update_xaxes()
+    fig.update_yaxes()
+    fig.update_layout(margin={'l': 40, 'b': 40, 't': 10, 'r': 0}, hovermode='closest')
+    return fig
+
+@app.callback(
+    Output('x-time-series', 'figure'),
+    Input('crossfilter-indicator-scatter', 'hoverData'),
+    Input('crossfilter-xaxis-column', 'value'),
+    Input('crossfilter-yaxis-type', 'value'))
+def update_y_timeseries(hoverData, xaxis_column_name, axis_type):
+    country_name = hoverData['points'][0]['customdata']
+    dff = df[df['type'] == axis_type]
+    dff = dff[dff['channel'] == xaxis_column_name]
+    title = '<b>{}</b><br>{}'.format(country_name, xaxis_column_name)
+    return create_time_series(dff, axis_type, title)
+
+@app.callback(
+    Output('y-time-series', 'figure'),
+    Input('crossfilter-indicator-scatter', 'hoverData'),
+    Input('crossfilter-yaxis-column', 'value'),
+    Input('crossfilter-yaxis-type', 'value'))
+def update_x_timeseries(hoverData, yaxis_column_name, axis_type):
+    dff = df[df['type'] == axis_type]
+    dff = dff[dff['channel'] == yaxis_column_name]
+    return create_time_series(dff, axis_type, yaxis_column_name)
+
+if __name__ == '__main__':
+    app.run_server(host='localhost',port=8007)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 왼쪽 그래프 산점도 
+# 클릭하면 오른쪽 그래프 값 
+
+
+
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = Dash(__name__, external_stylesheets=external_stylesheets)
@@ -207,7 +390,7 @@ def update_x_timeseries(hoverData, yaxis_column_name, axis_type):
     return create_time_series(dff, axis_type, yaxis_column_name)
 
 if __name__ == '__main__':
-    app.run_server(host='0.0.0.0', debug=True)
+    app.run_server(host='localhost',port=8007)
 
 
 
